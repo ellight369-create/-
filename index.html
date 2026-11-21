@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>殭屍體操間歇計數器</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans TC', system-ui, -apple-system, sans-serif;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    .ring-transition {
+      transition: stroke-dashoffset 0.35s linear, stroke 0.3s ease;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-amber-500/30">
+  <div class="mx-auto max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
+    <!-- Header -->
+    <header class="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"></circle>
+              <polyline points="12 7 12 12 15 14"></polyline>
+            </svg>
+          </span>
+          <h1 class="text-xl font-bold tracking-tight text-white sm:text-2xl">殭屍體操間歇計數器</h1>
+        </div>
+        <p class="mt-1 text-xs text-slate-400 sm:text-sm">預設標準節奏：原地慢跑甩手 60 秒 ＋ 原地踏步放鬆 30 秒</p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="toggleSoundBtn" type="button" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-slate-800" aria-pressed="true">
+          <span id="soundIcon"></span>
+          <span id="soundLabel">提示音 開</span>
+        </button>
+        <button id="toggleVoiceBtn" type="button" class="inline-flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-slate-800" aria-pressed="true">
+          <span id="voiceIcon"></span>
+          <span id="voiceLabel">語音 開</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Timer Card -->
+    <main class="rounded-3xl border border-slate-800/80 bg-slate-900/80 p-5 shadow-2xl shadow-black/40 backdrop-blur sm:p-7">
+      <!-- Phase & Set Indicator -->
+      <div class="mb-5 flex flex-wrap items-center justify-between gap-2">
+        <span id="phaseBadge" class="inline-flex items-center gap-2 rounded-full bg-slate-800 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-slate-200 sm:text-sm">
+          <span id="phaseDot" class="h-2.5 w-2.5 rounded-full bg-slate-400"></span>
+          <span id="phaseText">準備開始</span>
+        </span>
+        <div class="text-sm font-semibold text-slate-300 tabular-nums">
+          目標進度：<span id="setProgressText" class="text-white">0 / 3 組</span>
+        </div>
+      </div>
+
+      <!-- Circular Countdown Ring -->
+      <div class="relative mx-auto my-4 flex h-60 w-60 items-center justify-center sm:h-64 sm:w-64">
+        <svg class="h-full w-full -rotate-90" viewBox="0 0 220 220" aria-hidden="true">
+          <circle cx="110" cy="110" r="96" fill="none" stroke="#1e293b" stroke-width="14"></circle>
+          <circle id="progressRing" cx="110" cy="110" r="96" fill="none" stroke="#f59e0b" stroke-width="14" stroke-linecap="round" stroke-dasharray="603.19" stroke-dashoffset="0" class="ring-transition"></circle>
+        </svg>
+        <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+          <div id="timeDisplay" class="text-5xl font-extrabold tracking-tight text-white tabular-nums sm:text-6xl">01:00</div>
+          <div id="phaseSubtext" class="mt-2 max-w-[170px] text-xs font-medium text-slate-400 sm:text-sm">放鬆雙肩、自然甩手</div>
+        </div>
+      </div>
+
+      <!-- Next Phase Hint -->
+      <div id="nextHint" class="mb-6 text-center text-xs text-slate-400 sm:text-sm">
+        按下開始後將進行第 1 組（共 3 組，總計 04:30）
+      </div>
+
+      <!-- Primary Controls -->
+      <div class="flex flex-wrap items-center justify-center gap-3">
+        <button id="startPauseBtn" type="button" class="inline-flex min-w-[140px] items-center justify-center gap-2 rounded-2xl bg-amber-500 px-6 py-3.5 text-base font-bold text-slate-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-400 active:scale-[0.98]">
+          <span id="startPauseLabel">開始運動</span>
+        </button>
+        <button id="skipBtn" type="button" disabled class="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-slate-700 bg-slate-800/80 px-4 py-3.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40">
+          跳過此段
+        </button>
+        <button id="finishBtn" type="button" disabled class="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-rose-500/40 bg-rose-500/15 px-4 py-3.5 text-sm font-semibold text-rose-300 transition hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-40">
+          結束運動
+        </button>
+        <button id="resetSessionBtn" type="button" class="inline-flex items-center justify-center gap-1.5 rounded-2xl border border-slate-700 bg-slate-800/80 px-4 py-3.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-700">
+          重設本輪
+        </button>
+      </div>
+    </main>
+
+    <!-- Automatic Set Counter & Daily Stats -->
+    <section class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2" aria-label="累計組數統計">
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+        <div class="text-xs font-medium text-slate-400">今日自動累計組數</div>
+        <div class="mt-1 flex items-baseline justify-between gap-1">
+          <div class="text-2xl font-extrabold text-emerald-400 tabular-nums"><span id="todaySetsCount">0</span> <span class="text-sm font-semibold text-slate-400">組</span></div>
+          <button id="manualAddSetBtn" type="button" class="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/20" title="手動補記 1 組">+1 組</button>
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+        <div class="text-xs font-medium text-slate-400">今日累計運動時間</div>
+        <div class="mt-1 text-2xl font-extrabold text-white tabular-nums"><span id="todayMinutesCount">0.0</span> <span class="text-sm font-semibold text-slate-400">分鐘</span></div>
+      </div>
+
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+        <div class="text-xs font-medium text-slate-400">歷史總完成組數</div>
+        <div class="mt-1 text-2xl font-extrabold text-amber-400 tabular-nums"><span id="totalSetsCount">0</span> <span class="text-sm font-semibold text-slate-400">組</span></div>
+      </div>
+
+      <div class="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+        <div class="text-xs font-medium text-slate-400">歷史總運動時間</div>
+        <div class="mt-1 flex items-baseline justify-between gap-1">
+          <div class="text-2xl font-extrabold text-sky-400 tabular-nums"><span id="totalMinutesCount">0.0</span> <span class="text-sm font-semibold text-slate-400">分鐘</span></div>
+          <button id="openResetModalBtn" type="button" class="text-xs text-slate-500 underline-offset-2 transition hover:text-rose-400 hover:underline">清除紀錄</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Customizable Settings Panel -->
+    <section class="mt-5 rounded-3xl border border-slate-800/80 bg-slate-900/60 p-5 sm:p-6" aria-label="組數與時間設定">
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-base font-bold text-white">自訂組數與間歇時間</h2>
+        <span id="settingsLockNote" class="hidden rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-300">計時中已鎖定設定</span>
+      </div>
+
+      <!-- Quick Presets -->
+      <div class="mb-5 flex flex-wrap gap-2">
+        <button type="button" data-preset="1" class="preset-btn rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-amber-500/60 hover:text-amber-300">新手 1 組（1.5分）</button>
+        <button type="button" data-preset="3" class="preset-btn rounded-xl border border-amber-500/60 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-300 transition hover:bg-amber-500/25">標準 3 組（4.5分）</button>
+        <button type="button" data-preset="5" class="preset-btn rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-amber-500/60 hover:text-amber-300">進階 5 組（7.5分）</button>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <!-- Target Sets -->
+        <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-3.5">
+          <div class="flex items-center justify-between gap-2 text-xs font-medium text-slate-400">
+            <span>目標組數</span>
+            <span id="targetTotalDuration" class="text-amber-300 tabular-nums">總時數 04:30</span>
+          </div>
+          <div class="mt-2 flex items-center justify-between">
+            <button id="decSetsBtn" type="button" class="setting-ctrl flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 text-lg font-bold text-slate-200 transition hover:bg-slate-700 disabled:opacity-40" aria-label="減少組數">−</button>
+            <span id="targetSetsValue" class="text-xl font-bold text-white tabular-nums">3 組</span>
+            <button id="incSetsBtn" type="button" class="setting-ctrl flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 text-lg font-bold text-slate-200 transition hover:bg-slate-700 disabled:opacity-40" aria-label="增加組數">+</button>
+          </div>
+        </div>
+
+        <!-- Jog Duration -->
+        <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-3.5">
+          <div class="text-xs font-medium text-slate-400">原地慢跑甩手</div>
+          <div class="mt-2 flex items-center justify-between">
+            <button id="decJogBtn" type="button" class="setting-ctrl flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 text-sm font-bold text-slate-200 transition hover:bg-slate-700 disabled:opacity-40" aria-label="減少慢跑秒數">-5</button>
+            <span id="jogSecondsValue" class="text-xl font-bold text-amber-400 tabular-nums">60 秒</span>
+            <button id="incJogBtn" type="button" class="setting-ctrl flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 text-sm font-bold text-slate-200 transition hover:bg-slate-700 disabled:opacity-40" aria-label="增加慢跑秒數">+5</button>
+          </div>
+        </div>
+
+        <!-- Walk Duration -->
+        <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-3.5">
+          <div class="text-xs font-medium text-slate-400">原地踏步放鬆</div>
+          <div class="mt-2 flex items-center justify-between">
+            <button id="decWalkBtn" type="button" class="setting-ctrl flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 text-sm font-bold text-slate-200 transition hover:bg-slate-700 disabled:opacity-40" aria-label="減少踏步秒數">-5</button>
+            <span id="walkSecondsValue" class="text-xl font-bold text-emerald-400 tabular-nums">30 秒</span>
+            <button id="incWalkBtn" type="button" class="setting-ctrl flex h-9 w-9 items-center justify-center rounded-xl bg-slate-800 text-sm font-bold text-slate-200 transition hover:bg-slate-700 disabled:opacity-40" aria-label="增加踏步秒數">+5</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="pointer-events-none fixed bottom-5 left-1/2 z-40 -translate-x-1/2 translate-y-4 rounded-2xl border border-emerald-500/40 bg-slate-900/95 px-4 py-2.5 text-sm font-semibold text-emerald-300 opacity-0 shadow-xl transition duration-300"></div>
+
+    <!-- Confirm Clear Modal -->
+    <div id="resetModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+      <div class="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+        <h3 class="text-lg font-bold text-white">清除運動紀錄？</h3>
+        <p class="mt-2 text-sm text-slate-400">這將會把「今日自動累計組數」、「今日運動時間」、「歷史總完成組數」與「歷史總運動時間」歸零，無法復原。</p>
+        <div class="mt-5 flex justify-end gap-2.5">
+          <button id="cancelResetModalBtn" type="button" class="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700">取消</button>
+          <button id="confirmResetModalBtn" type="button" class="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-500">確認清除</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const STORAGE_KEY = 'zombie_exercise_counter_v1';
+      const RING_CIRCUMFERENCE = 2 * Math.PI * 96; // ~603.19
+
+      const getTodayKey = () => {
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
+
+      const defaultStats = () => ({
+        date: getTodayKey(),
+        todaySets: 0,
+        todaySeconds: 0,
+        totalSets: 0,
+        totalSeconds: 0
+      });
+
+      const loadState = () => {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return null;
+          return JSON.parse(raw);
+        } catch (e) {
+          return null;
+        }
+      };
+
+      const saveState = () => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            targetSets: state.targetSets,
+            jogSeconds: state.jogSeconds,
+            walkSeconds: state.walkSeconds,
+            soundEnabled: state.soundEnabled,
+            voiceEnabled: state.voiceEnabled,
+            stats: state.stats
+          }));
+        } catch (e) {
+          // Ignore storage errors in restricted environments
+        }
+      };
+
+      const saved = loadState();
+      const todayKey = getTodayKey();
+      let stats = defaultStats();
+      if (saved && saved.stats) {
+        stats.totalSets = Number(saved.stats.totalSets) || 0;
+        stats.totalSeconds = Number(saved.stats.totalSeconds) || 0;
+        if (saved.stats.date === todayKey) {
+          stats.todaySets = Number(saved.stats.todaySets) || 0;
+          stats.todaySeconds = Number(saved.stats.todaySeconds) || 0;
+          if (!saved.stats.totalSeconds && stats.todaySeconds > 0) {
+            stats.totalSeconds = stats.todaySeconds;
+          }
+        }
+      }
+
+      const state = {
+        targetSets: (saved && Number(saved.targetSets)) || 3,
+        jogSeconds: (saved && Number(saved.jogSeconds)) || 60,
+        walkSeconds: (saved && Number(saved.walkSeconds)) || 30,
+        soundEnabled: saved && typeof saved.soundEnabled === 'boolean' ? saved.soundEnabled : true,
+        voiceEnabled: saved && typeof saved.voiceEnabled === 'boolean' ? saved.voiceEnabled : true,
+        status: 'idle', // 'idle' | 'running' | 'paused' | 'completed'
+        phase: 'jog',   // 'jog' | 'walk'
+        currentSet: 1,
+        completedInSession: 0,
+        remainingSeconds: (saved && Number(saved.jogSeconds)) || 60,
+        stats
+      };
+
+      let timerId = null;
+      let audioCtx = null;
+      let toastTimer = null;
+
+      // DOM elements
+      const el = {
+        toggleSoundBtn: document.getElementById('toggleSoundBtn'),
+        soundIcon: document.getElementById('soundIcon'),
+        soundLabel: document.getElementById('soundLabel'),
+        toggleVoiceBtn: document.getElementById('toggleVoiceBtn'),
+        voiceIcon: document.getElementById('voiceIcon'),
+        voiceLabel: document.getElementById('voiceLabel'),
+        phaseBadge: document.getElementById('phaseBadge'),
+        phaseDot: document.getElementById('phaseDot'),
+        phaseText: document.getElementById('phaseText'),
+        setProgressText: document.getElementById('setProgressText'),
+        progressRing: document.getElementById('progressRing'),
+        timeDisplay: document.getElementById('timeDisplay'),
+        phaseSubtext: document.getElementById('phaseSubtext'),
+        nextHint: document.getElementById('nextHint'),
+        startPauseBtn: document.getElementById('startPauseBtn'),
+        startPauseLabel: document.getElementById('startPauseLabel'),
+        skipBtn: document.getElementById('skipBtn'),
+        finishBtn: document.getElementById('finishBtn'),
+        resetSessionBtn: document.getElementById('resetSessionBtn'),
+        todaySetsCount: document.getElementById('todaySetsCount'),
+        todayMinutesCount: document.getElementById('todayMinutesCount'),
+        totalSetsCount: document.getElementById('totalSetsCount'),
+        totalMinutesCount: document.getElementById('totalMinutesCount'),
+        manualAddSetBtn: document.getElementById('manualAddSetBtn'),
+        openResetModalBtn: document.getElementById('openResetModalBtn'),
+        settingsLockNote: document.getElementById('settingsLockNote'),
+        targetSetsValue: document.getElementById('targetSetsValue'),
+        targetTotalDuration: document.getElementById('targetTotalDuration'),
+        jogSecondsValue: document.getElementById('jogSecondsValue'),
+        walkSecondsValue: document.getElementById('walkSecondsValue'),
+        decSetsBtn: document.getElementById('decSetsBtn'),
+        incSetsBtn: document.getElementById('incSetsBtn'),
+        decJogBtn: document.getElementById('decJogBtn'),
+        incJogBtn: document.getElementById('incJogBtn'),
+        decWalkBtn: document.getElementById('decWalkBtn'),
+        incWalkBtn: document.getElementById('incWalkBtn'),
+        presetBtns: document.querySelectorAll('.preset-btn'),
+        settingCtrls: document.querySelectorAll('.setting-ctrl'),
+        toast: document.getElementById('toast'),
+        resetModal: document.getElementById('resetModal'),
+        cancelResetModalBtn: document.getElementById('cancelResetModalBtn'),
+        confirmResetModalBtn: document.getElementById('confirmResetModalBtn')
+      };
+
+      const ensureAudio = () => {
+        if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          audioCtx = new Ctx();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume().catch(() => {});
+        }
+      };
+
+      const playTone = (freq, duration, type = 'sine', delay = 0) => {
+        if (!state.soundEnabled) return;
+        ensureAudio();
+        if (!audioCtx) return;
+        const now = audioCtx.currentTime + delay;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now);
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.exponentialRampToValueAtTime(0.18, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + duration + 0.02);
+      };
+
+      const playCue = (kind) => {
+        if (kind === 'tick') {
+          playTone(660, 0.08, 'sine');
+        } else if (kind === 'jog') {
+          playTone(523.25, 0.12, 'triangle', 0);
+          playTone(783.99, 0.18, 'triangle', 0.13);
+        } else if (kind === 'walk') {
+          playTone(659.25, 0.14, 'sine', 0);
+          playTone(523.25, 0.2, 'sine', 0.15);
+        } else if (kind === 'finish') {
+          playTone(587.33, 0.12, 'sine', 0);
+          playTone(440, 0.22, 'sine', 0.13);
+        } else if (kind === 'complete') {
+          playTone(523.25, 0.12, 'triangle', 0);
+          playTone(659.25, 0.12, 'triangle', 0.13);
+          playTone(783.99, 0.15, 'triangle', 0.26);
+          playTone(1046.5, 0.35, 'triangle', 0.42);
+        }
+      };
+
+      const speak = (text) => {
+        if (!state.voiceEnabled || !('speechSynthesis' in window)) return;
+        try {
+          window.speechSynthesis.cancel();
+          const utter = new SpeechSynthesisUtterance(text);
+          utter.lang = 'zh-TW';
+          utter.rate = 1.05;
+          window.speechSynthesis.speak(utter);
+        } catch (e) {
+          // Ignore speech errors
+        }
+      };
+
+      const showToast = (msg) => {
+        el.toast.textContent = msg;
+        el.toast.classList.remove('opacity-0', 'translate-y-4');
+        el.toast.classList.add('opacity-100', 'translate-y-0');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          el.toast.classList.remove('opacity-100', 'translate-y-0');
+          el.toast.classList.add('opacity-0', 'translate-y-4');
+        }, 2400);
+      };
+
+      const formatMMSS = (totalSec) => {
+        const s = Math.max(0, Math.floor(totalSec));
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const rem = s % 60;
+        if (h > 0) {
+          return `${h}:${String(m).padStart(2, '0')}:${String(rem).padStart(2, '0')}`;
+        }
+        return `${String(m).padStart(2, '0')}:${String(rem).padStart(2, '0')}`;
+      };
+
+      const syncDateRollover = () => {
+        const current = getTodayKey();
+        if (state.stats.date !== current) {
+          state.stats.date = current;
+          state.stats.todaySets = 0;
+          state.stats.todaySeconds = 0;
+        }
+      };
+
+      const recordCompletedSet = (durationSec) => {
+        syncDateRollover();
+        state.stats.todaySets += 1;
+        state.stats.todaySeconds += durationSec;
+        state.stats.totalSets += 1;
+        state.stats.totalSeconds += durationSec;
+        saveState();
+      };
+
+      const render = () => {
+        syncDateRollover();
+
+        // Audio / Voice buttons
+        el.soundIcon.innerHTML = state.soundEnabled
+          ? '<svg class="h-4 w-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>'
+          : '<svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>';
+        el.soundLabel.textContent = state.soundEnabled ? '提示音 開' : '提示音 關';
+        el.toggleSoundBtn.setAttribute('aria-pressed', String(state.soundEnabled));
+
+        el.voiceIcon.innerHTML = state.voiceEnabled
+          ? '<svg class="h-4 w-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path></svg>'
+          : '<svg class="h-4 w-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"></path></svg>';
+        el.voiceLabel.textContent = state.voiceEnabled ? '語音 開' : '語音 關';
+        el.toggleVoiceBtn.setAttribute('aria-pressed', String(state.voiceEnabled));
+
+        // Phase UI & Ring
+        const phaseTotal = state.phase === 'jog' ? state.jogSeconds : state.walkSeconds;
+        const ratio = state.status === 'idle' || state.status === 'completed' || state.status === 'ended'
+          ? 1
+          : Math.max(0, Math.min(1, state.remainingSeconds / Math.max(1, phaseTotal)));
+        el.progressRing.style.strokeDasharray = String(RING_CIRCUMFERENCE);
+        el.progressRing.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - ratio));
+
+        if (state.status === 'idle') {
+          el.phaseDot.className = 'h-2.5 w-2.5 rounded-full bg-slate-400';
+          el.phaseText.textContent = '準備開始';
+          el.phaseBadge.className = 'inline-flex items-center gap-2 rounded-full bg-slate-800 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-slate-200 sm:text-sm';
+          el.progressRing.setAttribute('stroke', '#f59e0b');
+          el.phaseSubtext.textContent = '放鬆雙肩、自然甩手';
+          const totalSessionSec = state.targetSets * (state.jogSeconds + state.walkSeconds);
+          el.nextHint.textContent = `按下開始後將進行第 1 組（共 ${state.targetSets} 組，總計 ${formatMMSS(totalSessionSec)}）`;
+          el.startPauseLabel.textContent = '開始運動';
+          el.startPauseBtn.className = 'inline-flex min-w-[140px] items-center justify-center gap-2 rounded-2xl bg-amber-500 px-6 py-3.5 text-base font-bold text-slate-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-400 active:scale-[0.98]';
+        } else if (state.status === 'completed') {
+          el.phaseDot.className = 'h-2.5 w-2.5 rounded-full bg-emerald-400';
+          el.phaseText.textContent = '本輪已完成';
+          el.phaseBadge.className = 'inline-flex items-center gap-2 rounded-full bg-emerald-500/20 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-emerald-300 sm:text-sm';
+          el.progressRing.setAttribute('stroke', '#10b981');
+          el.phaseSubtext.textContent = `順利完成 ${state.targetSets} 組！`;
+          el.nextHint.textContent = '已自動累計到今日組數，可點擊「再來一輪」繼續';
+          el.startPauseLabel.textContent = '再來一輪';
+          el.startPauseBtn.className = 'inline-flex min-w-[140px] items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-6 py-3.5 text-base font-bold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 active:scale-[0.98]';
+        } else if (state.status === 'ended') {
+          el.phaseDot.className = 'h-2.5 w-2.5 rounded-full bg-sky-400';
+          el.phaseText.textContent = '已結束本次運動';
+          el.phaseBadge.className = 'inline-flex items-center gap-2 rounded-full bg-sky-500/20 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-sky-300 sm:text-sm';
+          el.progressRing.setAttribute('stroke', '#38bdf8');
+          el.phaseSubtext.textContent = `本次共完成 ${state.completedInSession} 組`;
+          el.nextHint.textContent = '已保留完成的組數紀錄，可點擊「再來一輪」重新開始';
+          el.startPauseLabel.textContent = '再來一輪';
+          el.startPauseBtn.className = 'inline-flex min-w-[140px] items-center justify-center gap-2 rounded-2xl bg-amber-500 px-6 py-3.5 text-base font-bold text-slate-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-400 active:scale-[0.98]';
+        } else if (state.phase === 'jog') {
+          el.phaseDot.className = 'h-2.5 w-2.5 rounded-full bg-amber-400 animate-pulse';
+          el.phaseText.textContent = `第 ${state.currentSet} 組・原地慢跑甩手`;
+          el.phaseBadge.className = 'inline-flex items-center gap-2 rounded-full bg-amber-500/20 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-amber-300 sm:text-sm';
+          el.progressRing.setAttribute('stroke', '#f59e0b');
+          el.phaseSubtext.textContent = '縮小腹、肩膀與手臂自然前後晃動';
+          el.nextHint.textContent = `下一階段：原地踏步放鬆 ${state.walkSeconds} 秒`;
+          el.startPauseLabel.textContent = state.status === 'running' ? '暫停' : '繼續';
+          el.startPauseBtn.className = state.status === 'running'
+            ? 'inline-flex min-w-[140px] items-center justify-center gap-2 rounded-2xl bg-slate-200 px-6 py-3.5 text-base font-bold text-slate-950 transition hover:bg-white active:scale-[0.98]'
+            : 'inline-flex min-w-[140px] items-center justify-center gap-2 rounded-2xl bg-amber-500 px-6 py-3.5 text-base font-bold text-slate-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-400 active:scale-[0.98]';
+        } else {
+          el.phaseDot.className = 'h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse';
+          el.phaseText.textContent = `第 ${state.currentSet} 組・原地踏步放鬆`;
+          el.phaseBadge.className = 'inline-flex items-center gap-2 rounded-full bg-emerald-500/20 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-emerald-300 sm:text-sm';
+          el.progressRing.setAttribute('stroke', '#10b981');
+          el.phaseSubtext.textContent = '放慢節奏原地走路、調整呼吸';
+          el.nextHint.textContent = state.currentSet < state.targetSets
+            ? `下一階段：第 ${state.currentSet + 1} 組慢跑甩手 ${state.jogSeconds} 秒`
+            : '本段結束後即完成全部組數';
+          el.startPauseLabel.textContent = state.status === 'running' ? '暫停' : '繼續';
+          el.startPauseBtn.className = state.status === 'running'
+            ? 'inline-flex min-w-[140px] items-center justify-center gap-2 rounded-2xl bg-slate-200 px-6 py-3.5 text-base font-bold text-slate-950 transition hover:bg-white active:scale-[0.98]'
+            : 'inline-flex min-w-[140px] items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-6 py-3.5 text-base font-bold text-slate-950 shadow-lg shadow-emerald-500/20 transition hover:bg-emerald-400 active:scale-[0.98]';
+        }
+
+        el.timeDisplay.textContent = (state.status === 'completed' || state.status === 'ended') ? '00:00' : formatMMSS(state.remainingSeconds);
+        el.setProgressText.textContent = `${state.completedInSession} / ${state.targetSets} 組`;
+        el.skipBtn.disabled = !(state.status === 'running' || state.status === 'paused');
+        el.finishBtn.disabled = !(state.status === 'running' || state.status === 'paused');
+
+        // Daily & Total Stats
+        el.todaySetsCount.textContent = String(state.stats.todaySets);
+        el.todayMinutesCount.textContent = (state.stats.todaySeconds / 60).toFixed(1);
+        el.totalSetsCount.textContent = String(state.stats.totalSets);
+        el.totalMinutesCount.textContent = (state.stats.totalSeconds / 60).toFixed(1);
+
+        // Settings Panel
+        const isLocked = state.status === 'running' || state.status === 'paused';
+        el.settingsLockNote.classList.toggle('hidden', !isLocked);
+        el.settingCtrls.forEach((btn) => { btn.disabled = isLocked; });
+        el.presetBtns.forEach((btn) => {
+          btn.disabled = isLocked;
+          const presetSets = Number(btn.getAttribute('data-preset'));
+          const isActive = presetSets === state.targetSets && state.jogSeconds === 60 && state.walkSeconds === 30;
+          btn.className = isActive
+            ? 'preset-btn rounded-xl border border-amber-500/60 bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-300 transition hover:bg-amber-500/25 disabled:opacity-40'
+            : 'preset-btn rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:border-amber-500/60 hover:text-amber-300 disabled:opacity-40';
+        });
+
+        el.targetSetsValue.textContent = `${state.targetSets} 組`;
+        el.targetTotalDuration.textContent = `總時數 ${formatMMSS(state.targetSets * (state.jogSeconds + state.walkSeconds))}`;
+        el.jogSecondsValue.textContent = `${state.jogSeconds} 秒`;
+        el.walkSecondsValue.textContent = `${state.walkSeconds} 秒`;
+      };
+
+      const stopInterval = () => {
+        if (timerId !== null) {
+          clearInterval(timerId);
+          timerId = null;
+        }
+      };
+
+      const advancePhase = () => {
+        if (state.phase === 'jog') {
+          state.phase = 'walk';
+          state.remainingSeconds = state.walkSeconds;
+          playCue('walk');
+          speak('原地踏步放鬆');
+        } else {
+          // Completed 1 full set (jog + walk)
+          state.completedInSession += 1;
+          recordCompletedSet(state.jogSeconds + state.walkSeconds);
+
+          if (state.currentSet >= state.targetSets) {
+            stopInterval();
+            state.status = 'completed';
+            state.remainingSeconds = 0;
+            playCue('complete');
+            speak(`恭喜完成 ${state.targetSets} 組殭屍體操`);
+            showToast(`完成 ${state.targetSets} 組！今日已累計 ${state.stats.todaySets} 組`);
+          } else {
+            state.currentSet += 1;
+            state.phase = 'jog';
+            state.remainingSeconds = state.jogSeconds;
+            playCue('jog');
+            speak(`第 ${state.currentSet} 組，原地慢跑甩手`);
+            showToast(`完成第 ${state.completedInSession} 組，已自動累計`);
+          }
+        }
+        render();
+      };
+
+      const startTimerLoop = () => {
+        stopInterval();
+        timerId = setInterval(() => {
+          if (state.status !== 'running') return;
+          state.remainingSeconds -= 1;
+          if (state.remainingSeconds > 0 && state.remainingSeconds <= 3) {
+            playCue('tick');
+          }
+          if (state.remainingSeconds <= 0) {
+            advancePhase();
+          } else {
+            render();
+          }
+        }, 1000);
+      };
+
+      // Event Listeners
+      el.startPauseBtn.addEventListener('click', () => {
+        ensureAudio();
+        if (state.status === 'idle' || state.status === 'completed' || state.status === 'ended') {
+          state.status = 'running';
+          state.phase = 'jog';
+          state.currentSet = 1;
+          state.completedInSession = 0;
+          state.remainingSeconds = state.jogSeconds;
+          playCue('jog');
+          speak('第 1 組，開始原地慢跑甩手');
+          startTimerLoop();
+        } else if (state.status === 'running') {
+          state.status = 'paused';
+          stopInterval();
+        } else if (state.status === 'paused') {
+          state.status = 'running';
+          startTimerLoop();
+        }
+        render();
+      });
+
+      el.skipBtn.addEventListener('click', () => {
+        if (state.status !== 'running' && state.status !== 'paused') return;
+        advancePhase();
+      });
+
+      el.finishBtn.addEventListener('click', () => {
+        if (state.status !== 'running' && state.status !== 'paused') return;
+        stopInterval();
+        if ('speechSynthesis' in window) {
+          try { window.speechSynthesis.cancel(); } catch (e) {}
+        }
+        state.status = 'ended';
+        state.remainingSeconds = 0;
+        playCue('finish');
+        speak(`運動結束，本次完成 ${state.completedInSession} 組`);
+        showToast(`已結束本次運動，共完成 ${state.completedInSession} 組`);
+        render();
+      });
+
+      el.resetSessionBtn.addEventListener('click', () => {
+        stopInterval();
+        if ('speechSynthesis' in window) {
+          try { window.speechSynthesis.cancel(); } catch (e) {}
+        }
+        state.status = 'idle';
+        state.phase = 'jog';
+        state.currentSet = 1;
+        state.completedInSession = 0;
+        state.remainingSeconds = state.jogSeconds;
+        render();
+      });
+
+      el.manualAddSetBtn.addEventListener('click', () => {
+        recordCompletedSet(state.jogSeconds + state.walkSeconds);
+        showToast(`已手動補記 1 組（今日共 ${state.stats.todaySets} 組）`);
+        render();
+      });
+
+      el.toggleSoundBtn.addEventListener('click', () => {
+        state.soundEnabled = !state.soundEnabled;
+        if (state.soundEnabled) playCue('tick');
+        saveState();
+        render();
+      });
+
+      el.toggleVoiceBtn.addEventListener('click', () => {
+        state.voiceEnabled = !state.voiceEnabled;
+        if (state.voiceEnabled) speak('語音提示已開啟');
+        saveState();
+        render();
+      });
+
+      const updateSetting = (key, delta, min, max) => {
+        if (state.status === 'running' || state.status === 'paused') return;
+        state[key] = Math.min(max, Math.max(min, state[key] + delta));
+        if (state.status === 'idle' || state.status === 'completed' || state.status === 'ended') {
+          state.status = 'idle';
+          state.phase = 'jog';
+          state.currentSet = 1;
+          state.completedInSession = 0;
+          state.remainingSeconds = state.jogSeconds;
+        }
+        saveState();
+        render();
+      };
+
+      el.decSetsBtn.addEventListener('click', () => updateSetting('targetSets', -1, 1, 20));
+      el.incSetsBtn.addEventListener('click', () => updateSetting('targetSets', 1, 1, 20));
+      el.decJogBtn.addEventListener('click', () => updateSetting('jogSeconds', -5, 10, 180));
+      el.incJogBtn.addEventListener('click', () => updateSetting('jogSeconds', 5, 10, 180));
+      el.decWalkBtn.addEventListener('click', () => updateSetting('walkSeconds', -5, 5, 120));
+      el.incWalkBtn.addEventListener('click', () => updateSetting('walkSeconds', 5, 5, 120));
+
+      el.presetBtns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (state.status === 'running' || state.status === 'paused') return;
+          state.targetSets = Number(btn.getAttribute('data-preset'));
+          state.jogSeconds = 60;
+          state.walkSeconds = 30;
+          state.status = 'idle';
+          state.phase = 'jog';
+          state.currentSet = 1;
+          state.completedInSession = 0;
+          state.remainingSeconds = state.jogSeconds;
+          saveState();
+          render();
+        });
+      });
+
+      el.openResetModalBtn.addEventListener('click', () => {
+        el.resetModal.classList.remove('hidden');
+        el.resetModal.classList.add('flex');
+      });
+
+      el.cancelResetModalBtn.addEventListener('click', () => {
+        el.resetModal.classList.add('hidden');
+        el.resetModal.classList.remove('flex');
+      });
+
+      el.confirmResetModalBtn.addEventListener('click', () => {
+        state.stats = defaultStats();
+        saveState();
+        el.resetModal.classList.add('hidden');
+        el.resetModal.classList.remove('flex');
+        showToast('已清除運動紀錄');
+        render();
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
